@@ -1,11 +1,20 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
 import ThumbDownOffAltOutlinedIcon from "@mui/icons-material/ThumbDownOffAltOutlined";
 import ReplyOutlinedIcon from "@mui/icons-material/ReplyOutlined";
 import AddTaskOutlinedIcon from "@mui/icons-material/AddTaskOutlined";
+import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import ThumbDownIcon from "@mui/icons-material/ThumbDown";
 import { Comments } from '../components/Comments';
-import { Card } from '../components/Card'
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation } from 'react-router-dom';
+import axios from 'axios';
+import { dislike, fetchSuccess, like } from '../redux/videoSlice';
+import { format } from 'timeago.js';
+import { subscription } from '../redux/userSlice';
+import Recommendation from '../components/Recommendation';
+
 
 const Container = styled.div`
   display: flex;
@@ -23,7 +32,7 @@ const Title = styled.h1`
   font-weight:400;
   margin-top:20px;
   margin-bottom:10px;
-  color: ${({theme}) => theme.text}
+  color: ${({ theme }) => theme.text}
 `
 
 const Details = styled.div`
@@ -32,12 +41,12 @@ const Details = styled.div`
   justify-content: space-between;
 `
 const Info = styled.span`
-  color: ${({theme}) => theme.textSoft};
+  color: ${({ theme }) => theme.textSoft};
 `
 const Buttons = styled.div`
   display: flex;
   gap:20px;
-  color:${({theme}) => theme.text};
+  color:${({ theme }) => theme.text};
 
 `
 const Button = styled.div`
@@ -49,11 +58,7 @@ const Button = styled.div`
 
 const Hr = styled.hr`
   margin: 15px 0px;
-  border: 0.5px solid ${({theme}) => theme.soft};
-`
-
-const Recommendation = styled.div`
-  flex:2;
+  border: 0.5px solid ${({ theme }) => theme.soft};
 `
 const Channel = styled.div`
   display: flex;
@@ -72,7 +77,7 @@ const Image = styled.img`
 const ChannelDetails = styled.div`
   display:flex;
   flex-direction: column;
-  color: ${({theme}) => theme.text};
+  color: ${({ theme }) => theme.text};
 `
 const ChannelName = styled.span`
   font-weight:500;
@@ -80,7 +85,7 @@ const ChannelName = styled.span`
 const ChannelCounter = styled.span`
   margin-top: 5px;
   margin-bottom: 20px;
-  color: ${({theme}) => theme.text};
+  color: ${({ theme }) => theme.text};
   font-size: 12px;
 `
 const Description = styled.p`
@@ -98,69 +103,102 @@ const Subcribe = styled.button`
   cursor: pointer;
 `
 
+const VideoFrame =styled.video`
+  max-height: 720px;
+  width:100%;
+  object-fit: cover;
+`
+
 export const Video = () => {
+  const { currentUser } = useSelector((state) => state.user);
+  const { currentVideo } = useSelector((state) => state.video);
+  const dispatch = useDispatch();
+
+  console.log(currentUser);
+  console.log(currentVideo);
+
+  const path = useLocation().pathname.split("/")[2]
+  //console.log(path);   //Ra đường dẫn dính với id cắt ra thành video id
+
+  const [channel, setChannel] = useState({})
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await axios.put(`/videos/view/${currentVideo._id}`)
+
+        const videoRes = await axios.get(`/videos/find/${path}`);
+        const channelRes = await axios.get(
+          `/users/find/${videoRes.data.userId}`
+        );
+        setChannel(channelRes.data);
+        dispatch(fetchSuccess(videoRes.data));
+      } catch (err) { }
+    };
+    fetchData();
+  }, [path, dispatch,currentVideo._id]);
+
+  const handleLike = async () => {
+    await axios.put(`/users/like/${currentVideo._id}`)
+    dispatch(like(currentUser._id))
+  }
+
+  const handleDislike = async () => {
+    await axios.put(`/users/dislike/${currentVideo._id}`)
+    dispatch(dislike(currentUser._id))
+  }
+
+  const handleSub = async () => {
+    currentUser.subscribedUsers.includes(channel._id) 
+    ? await axios.put(`/users/unsub/${channel._id}`) 
+    : await axios.put(`/users/sub/${channel._id}`)
+    dispatch(subscription(channel._id))
+  }
+
   return (
     <Container>
       <Content>
         <VideoWrapper>
-          <iframe
-            width="100%"
-            height="720"
-            src="https://www.youtube.com/embed/k3Vfj-e1Ma4"
-            title="YouTube video player"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-          ></iframe>
+          <VideoFrame src={currentVideo.videoUrl} controls/>
         </VideoWrapper>
-        <Title>Test video</Title>
+        <Title>{currentVideo.title}</Title>
         <Details>
-          <Info>7,948,154 views • Jun 22, 2022</Info>
+          <Info>{currentVideo.views} views • {format(currentVideo.createdAt)}</Info>
           <Buttons>
+            <Button onClick={handleLike}>
+              {currentVideo.likes?.includes(currentUser._id) ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />} {currentVideo.likes?.length}
+            </Button>
+            <Button onClick={handleDislike}>
+              {currentVideo.dislikes?.includes(currentUser._id) ? <ThumbDownIcon /> : <ThumbDownOffAltOutlinedIcon />} Dislike
+            </Button>
             <Button>
-              <ThumbUpOutlinedIcon /> 123
+              <ReplyOutlinedIcon /> Share
             </Button>
-            <Button> 
-              <ThumbDownOffAltOutlinedIcon /> Dislike
-            </Button>
-            <Button> 
-            <ReplyOutlinedIcon /> Share
-            </Button>
-            <Button> 
+            <Button>
               <AddTaskOutlinedIcon /> Save
             </Button>
           </Buttons>
         </Details>
-        <Hr/>
+        <Hr />
         <Channel>
           <ChannelInfo>
-            <Image src="https://yt3.ggpht.com/yti/AJo0G0n3ymlgfyzP45NSvW__iTfJ8eKuvnf657zUB1mCVQ=s88-c-k-c0x00ffffff-no-rj-mo" />
+            <Image src={channel.img} />
             <ChannelDetails>
-              <ChannelName>Hoang Phuc</ChannelName>
-              <ChannelCounter>100k subcribers</ChannelCounter>
-              <Description>Lorem ipsum dolor sit amet consectetur adipisicing elit. Adipisci sunt quisquam velit reiciendis alias accusamus hic rem vero saepe. Temporibus, facilis quam assumenda facere officiis minima non! Explicabo, commodi iste. Phuc</Description>
+              <ChannelName>{channel.name}</ChannelName>
+              <ChannelCounter>{channel.subscribers} subcribers</ChannelCounter>
+              <Description>{currentVideo?.desc}</Description>
             </ChannelDetails>
           </ChannelInfo>
-          <Subcribe>Subcribe</Subcribe>
+          <Subcribe onClick={handleSub}>
+            {currentUser.subscribedUsers?.includes(channel._id)
+              ? "SUBSCRIBED" : "SUBSCRIBE"}
+          </Subcribe>
         </Channel>
-        <Hr/>
+        <Hr />
         {/* Phần comment */}
-        <Comments/>
+        <Comments videoId={currentVideo._id} />
       </Content>
-      <Recommendation>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-        <Card type="sm"/>
-      </Recommendation>
+     <Recommendation tags={currentVideo.tags}/>
     </Container>
   )
 }
